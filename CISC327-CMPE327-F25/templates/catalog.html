@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>📖 Book Catalog</h2>
+<p>Browse all available books in our library collection.</p>
+
+{% if books %}
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Title</th>
+            <th>Author</th>
+            <th>ISBN</th>
+            <th>Availability</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for book in books %}
+        <tr>
+            <td>{{ book.id }}</td>
+            <td>{{ book.title }}</td>
+            <td>{{ book.author }}</td>
+            <td>{{ book.isbn }}</td>
+            <td>
+                {% if book.available_copies > 0 %}
+                    <span class="status-available">{{ book.available_copies }}/{{ book.total_copies }} Available</span>
+                {% else %}
+                    <span class="status-unavailable">Not Available</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if book.available_copies > 0 %}
+                    <form method="POST" action="{{ url_for('borrowing.borrow_book') }}" style="display: inline;">
+                        <input type="hidden" name="book_id" value="{{ book.id }}">
+                        <input type="text" name="patron_id" placeholder="Patron ID (6 digits)" 
+                               pattern="[0-9]{6}" maxlength="6" required style="width: 120px; margin-right: 5px;">
+                        <button type="submit" class="btn btn-success">Borrow</button>
+                    </form>
+                {% else %}
+                    <span style="color: #666;">Unavailable</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div style="text-align: center; padding: 40px; color: #666;">
+    <h3>No books in catalog</h3>
+    <p>The library catalog is empty. <a href="{{ url_for('catalog.add_book') }}">Add the first book</a> to get started.</p>
+</div>
+{% endif %}
+
+<div style="margin-top: 30px;">
+    <a href="{{ url_for('catalog.add_book') }}" class="btn">➕ Add New Book</a>
+</div>
+{% endblock %}

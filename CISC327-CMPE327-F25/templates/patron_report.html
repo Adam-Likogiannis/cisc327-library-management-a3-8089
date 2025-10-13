@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>📂 Patron Report</h2>
+<p>View your patron status report.</p>
+
+<form method="GET" action="{{ url_for('patrons.patron_status_report') }}">
+  <div class="form-group">
+    <label for="q">Search Term</label>
+    <input type="text" id="q" name="q" value="{{ search_term or '' }}" required>
+    <small style="color: #666;">Enter patron ID to search</small>
+  </div>
+
+  <div class="form-group">
+    <button type="submit" class="btn">🔍 Search</button>
+  </div>
+</form>
+
+{% if search_term %}
+  <hr style="margin: 30px 0;">
+  <h3>Search Results for "{{ search_term }}"</h3>
+
+  {% if report %}
+    {% if report.status != 'OK' %}
+      <div style="padding:10px; border:1px solid #e57373; background:#ffebee; color:#c62828; border-radius:6px; margin-bottom:16px;">
+        {{ report.status }}
+      </div>
+    {% else %}
+      <!-- Summary cards -->
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin:14px 0;">
+        <div style="padding:12px; border:1px solid #e0e0e0; border-radius:8px;">
+          <div style="font-size:12px; color:#666;">Borrowed Count</div>
+          <div style="font-size:20px; font-weight:600;">{{ report.borrowed_count }}</div>
+        </div>
+        <div style="padding:12px; border:1px solid #e0e0e0; border-radius:8px;">
+          <div style="font-size:12px; color:#666;">Remaining Allowance</div>
+          <div style="font-size:20px; font-weight:600;">{{ report.remaining_allowance }}</div>
+        </div>
+        <div style="padding:12px; border:1px solid #e0e0e0; border-radius:8px;">
+          <div style="font-size:12px; color:#666;">Overdue Count</div>
+          <div style="font-size:20px; font-weight:600; color:#c62828;">
+            {{ report.overdue_count }}
+          </div>
+        </div>
+        <div style="padding:12px; border:1px solid #e0e0e0; border-radius:8px;">
+          <div style="font-size:12px; color:#666;">Next Due Date</div>
+          <div style="font-size:16px; font-weight:600;">{{ report.next_due_date or '—' }}</div>
+        </div>
+      </div>
+
+      <!-- Borrowed books table -->
+      <h4 style="margin-top:22px;">Borrowed Books</h4>
+      {% if report.borrowed_books and report.borrowed_books|length > 0 %}
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse;">
+            <thead>
+              <tr>
+                <th style="text-align:left; border-bottom:1px solid #ddd; padding:8px;">ID</th>
+                <th style="text-align:left; border-bottom:1px solid #ddd; padding:8px;">Title</th>
+                <th style="text-align:left; border-bottom:1px solid #ddd; padding:8px;">Author</th>
+                <th style="text-align:left; border-bottom:1px solid #ddd; padding:8px;">Borrowed</th>
+                <th style="text-align:left; border-bottom:1px solid #ddd; padding:8px;">Due</th>
+                <th style="text-align:left; border-bottom:1px solid #ddd; padding:8px;">Overdue?</th>
+                <th style="text-align:left; border-bottom:1px solid #ddd; padding:8px;">Days Overdue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for b in report.borrowed_books %}
+                <tr>
+                  <td style="border-bottom:1px solid #f0f0f0; padding:8px;">{{ b.book_id }}</td>
+                  <td style="border-bottom:1px solid #f0f0f0; padding:8px;">{{ b.title }}</td>
+                  <td style="border-bottom:1px solid #f0f0f0; padding:8px;">{{ b.author }}</td>
+                  <td style="border-bottom:1px solid #f0f0f0; padding:8px;">{{ b.borrow_date or '—' }}</td>
+                  <td style="border-bottom:1px solid #f0f0f0; padding:8px;">{{ b.due_date or '—' }}</td>
+                  <td style="border-bottom:1px solid #f0f0f0; padding:8px;">
+                    {% if b.is_overdue %}<span style="color:#c62828; font-weight:600;">Yes</span>{% else %}No{% endif %}
+                  </td>
+                  <td style="border-bottom:1px solid #f0f0f0; padding:8px;">{{ b.days_overdue }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p>No borrowed books on file.</p>
+      {% endif %}
+    {% endif %}
+  {% endif %}
+{% endif %}
+
+{% endblock %}
