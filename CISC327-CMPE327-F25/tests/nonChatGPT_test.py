@@ -10,7 +10,7 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 import database as db
-import library_service as ls
+import services.library_service as ls
 
 # ---------- Shared fixtures ----------
 @pytest.fixture(autouse=True)

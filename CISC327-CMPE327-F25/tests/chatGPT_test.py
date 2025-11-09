@@ -21,8 +21,8 @@ def _reload_library_service():
     """Reload after db.DATABASE is patched so the service binds to the temp DB."""
     if "library_service" in importlib.sys.modules:
         del importlib.sys.modules["library_service"]
-    import library_service
-    return importlib.reload(library_service)
+    import services.library_service
+    return importlib.reload(services.library_service)
 
 # ---- Per-test isolated SQLite file -------------------------------------------
 @pytest.fixture(scope="session")
