@@ -3,7 +3,7 @@ Search Routes - Patron report status functionality
 """
 
 from flask import Blueprint, render_template, request, flash
-from library_service import get_patron_status_report
+from services.library_service import get_patron_status_report
 
 patrons_bp = Blueprint('patrons', __name__)
 
