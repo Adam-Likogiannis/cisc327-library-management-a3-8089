@@ -9,7 +9,7 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 import database as db  # the DB access layer
-from library_service import add_book_to_catalog
+from services.library_service import add_book_to_catalog
 
 # --- Per-test isolated DB ---
 @pytest.fixture(autouse=True)
