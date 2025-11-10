@@ -2,6 +2,9 @@ import pytest
 from unittest.mock import Mock
 
 from services.library_service import (
+    add_book_to_catalog,
+    borrow_book_by_patron,
+    return_book_by_patron,
     pay_late_fees,
     refund_late_fee_payment,
 )
@@ -198,3 +201,176 @@ def test_invalid_refund_amounts(mocker):
     assert "Refund amount exceeds maximum late fee." in message
 
     gateway_mock.refund_payment.assert_not_called()
+
+# ----- Tests to boost coverage -----
+def test_add_book_db_failure(mocker):
+
+    mocker.patch("services.library_service.get_book_by_isbn", return_value=None)
+ 
+    mock_insert = mocker.patch(
+        "services.library_service.insert_book",
+        return_value=False,
+    )
+
+    success, message = add_book_to_catalog(
+        "Test Book", "Author Name", "1234567890123", 3
+    )
+
+    assert success is False
+    assert "database error" in message.lower()
+    mock_insert.assert_called_once()
+
+def test_borrow_book_db_error_on_insert(mocker):
+
+    mocker.patch(
+        "services.library_service.get_book_by_id",
+        return_value={"id": 1, "title": "Test", "available_copies": 1},
+    )
+    mocker.patch("services.library_service.get_patron_borrow_count", return_value=0)
+
+    mock_insert = mocker.patch(
+        "services.library_service.insert_borrow_record",
+        return_value=False,
+    )
+    mock_update = mocker.patch("services.library_service.update_book_availability")
+
+    success, message = borrow_book_by_patron("123456", 1)
+
+    assert success is False
+    assert "creating borrow record" in message.lower()
+    mock_insert.assert_called_once()
+    mock_update.assert_not_called()
+
+
+def test_borrow_book_db_error_on_update_availability(mocker):
+    mocker.patch(
+        "services.library_service.get_book_by_id",
+        return_value={"id": 1, "title": "Test", "available_copies": 1},
+    )
+    mocker.patch("services.library_service.get_patron_borrow_count", return_value=0)
+
+    mocker.patch("services.library_service.insert_borrow_record", return_value=True)
+
+    mock_update = mocker.patch(
+        "services.library_service.update_book_availability",
+        return_value=False,
+    )
+
+    success, message = borrow_book_by_patron("123456", 1)
+
+    assert success is False
+    assert "updating book availability" in message.lower()
+    mock_update.assert_called_once()
+
+def test_return_book_with_late_fee(mocker):
+    mocker.patch(
+        "services.library_service.get_book_by_id",
+        return_value={"id": 1, "title": "Test Book"},
+    )
+    mocker.patch(
+        "services.library_service.calculate_late_fee_for_book",
+        return_value={"fee_amount": 3.50, "days_overdue": 2, "status": "OK"},
+    )
+    mocker.patch(
+        "services.library_service.update_borrow_record_return_date",
+        return_value=True,
+    )
+    mocker.patch(
+        "services.library_service.update_book_availability",
+        return_value=True,
+    )
+
+    success, message = return_book_by_patron("123456", 1)
+
+    assert success is True
+    assert "late by 2 day(s)" in message.lower()
+    assert "$3.50" in message
+
+def test_return_book_db_error_on_update_availability(mocker):
+    mocker.patch(
+        "services.library_service.get_book_by_id",
+        return_value={"id": 1, "title": "Test Book"},
+    )
+    mocker.patch(
+        "services.library_service.calculate_late_fee_for_book",
+        return_value={"fee_amount": 0.0, "days_overdue": 0, "status": "OK"},
+    )
+    mocker.patch(
+        "services.library_service.update_borrow_record_return_date",
+        return_value=True,
+    )
+    mock_update = mocker.patch(
+        "services.library_service.update_book_availability",
+        return_value=False,
+    )
+
+    success, message = return_book_by_patron("123456", 1)
+
+    assert success is False
+    assert "database error" in message.lower()
+    mock_update.assert_called_once()
+
+def test_pay_late_fees_unable_to_calculate_fee(mocker):
+    mocker.patch(
+        "services.library_service.calculate_late_fee_for_book",
+        return_value={},  # missing 'fee_amount'
+    )
+
+    gateway_mock = Mock(spec=PaymentGateway)
+
+    success, message, txn_id = pay_late_fees("123456", 1, gateway_mock)
+
+    assert success is False
+    assert "unable to calculate late fees" in message.lower()
+    assert txn_id is None
+    gateway_mock.process_payment.assert_not_called()
+
+def test_pay_late_fees_book_not_found(mocker):
+    mocker.patch(
+        "services.library_service.calculate_late_fee_for_book",
+        return_value={"fee_amount": 5.00, "days_overdue": 3, "status": "OK"},
+    )
+    mocker.patch(
+        "services.library_service.get_book_by_id",
+        return_value=None,  # Book not found
+    )
+
+    gateway_mock = Mock(spec=PaymentGateway)
+
+    success, message, txn_id = pay_late_fees("123456", 1, gateway_mock)
+
+    assert success is False
+    assert "book not found" in message.lower()
+    assert txn_id is None
+    gateway_mock.process_payment.assert_not_called()
+
+def test_pay_late_fees_use_default_gateways_when_none(mocker):
+    mocker.patch(
+        "services.library_service.calculate_late_fee_for_book",
+        return_value={"fee_amount": 5.00, "days_overdue": 3, "status": "OK"},
+    )
+    mocker.patch(
+        "services.library_service.get_book_by_id",
+        return_value={"id": 1, "title": "Test Book"},
+    )
+
+    # Mock the default payment gateway inside the library_service module
+    default_gateway_mock = Mock(spec=PaymentGateway)
+    default_gateway_mock.process_payment.return_value = (True, "txn_456", "Approved")
+
+    mocker.patch(
+        "services.library_service.PaymentGateway",
+        return_value=default_gateway_mock,
+    )
+
+    success, message, txn_id = pay_late_fees("123456", 1, None)
+
+    assert success is True
+    assert "Payment successful" in message
+    assert txn_id == "txn_456"
+
+    default_gateway_mock.process_payment.assert_called_once_with(
+        patron_id="123456",
+        amount=5.00,
+        description="Late fees for 'Test Book'",
+    )
